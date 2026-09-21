@@ -1,0 +1,58 @@
+# Creature HQ
+
+**Live:** https://creature-hq.web.app
+
+A fullstack developer roadmap where passing quizzes and shipping projects grows a creature companion.
+Hosted on Firebase: sign-in with Firebase Auth (Google + email/password), one Firestore document per player.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `public/index.html` | Landing page (indexed by search engines). Generated. |
+| `public/app.html` | The game, served at `/app` (noindex). Generated. |
+| `public/privacy.html`, `public/404.html` | Generated. |
+| `public/assets/game.js` | Game code (was the inline scripts of v13). Edit this. |
+| `public/assets/quiz.js` | Quiz bank, 5 questions × 177 checkpoints. |
+| `public/assets/sync.js` | Sign-in screen + cloud save. Loads the save into localStorage, then starts the game. |
+| `public/assets/firebase-config.js` | Public web config for the Firebase project. |
+| `firestore.rules` | Only the signed-in owner can read/write `users/{uid}`; everything else is closed. |
+| `tools/build-site.mjs` | Regenerates landing/privacy/404/sitemap/robots/manifest. |
+| `tools/build-app.mjs` | Regenerates `app.html` from `tools/body.html`. |
+| `tools/checkquiz.mjs` | Checks every checkpoint has 5 valid quiz questions. |
+
+## How saving works
+
+The game still reads and writes its own localStorage keys. `sync.js`:
+
+1. Waits for sign-in, then reads `users/{uid}` and writes it into localStorage before loading `game.js`.
+2. After every game `save()`, writes the whole save back (1.5 s debounce, flushed when the tab is hidden or closed).
+3. Keeps a revision number. If this device has changes the server never got (closed while offline), they're pushed on the next load; if another device saved something newer, that wins.
+4. If another tab or device saves while this one is open, this tab stops saving and asks you to reload, so older progress never overwrites newer progress.
+
+## Commands
+
+```bash
+# rebuild pages after changing game data or copy (SITE = the public URL)
+SITE=https://creature-hq.web.app node tools/build-site.mjs
+
+# local preview in test mode (no sign-in) while firebase-config.js is blank
+npx serve public
+
+# local preview against emulators (needs Java): copy tools/demo-config.js over public/assets/firebase-config.js, then
+npx firebase-tools emulators:start --only auth,firestore --project demo-creature-hq
+
+# deploy
+npx firebase-tools deploy --only hosting,firestore:rules --project <project-id>
+```
+
+Bump `?v=14` in `tools/build-app.mjs`, `tools/build-site.mjs` and `sync.js` when you change assets, so browsers fetch the new files.
+
+## Bugs fixed from v13
+
+- Importing a backup (or loading a save) with a damaged companion could crash the pantry and stats; companions are now repaired on load (`cleanPet`).
+- The floating window's feed button crashed if the companion was deleted while it was open; resetting progress now also closes the floating window.
+- Opening a project in the Proof vault whose checkpoint no longer exists crashed; now ignored.
+- Typing ↑↑↑↓↓←→←→BA (an extra ↑) didn't trigger the cheat code.
+- Notes typed right before closing the tab on mobile could be lost (`pagehide` now flushes them).
+- Export didn't include sound and focus-length settings; import now restores them.

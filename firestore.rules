@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // One document per player: users/{uid} holds their whole save.
+    match /users/{uid} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      function validSave() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['schema', 'rev', 'session', 'save', 'createdAt', 'updatedAt'])
+          && d.schema == 1
+          && d.rev is int && d.rev >= 0
+          && d.session is string && d.session.size() <= 64
+          && d.save is map
+          && d.save.keys().hasOnly(['done', 'streak', 'lastDate', 'extra', 'subs', 'notes', 'quiz', 'pet', 'rulesSeen', 'dataVersion'])
+          && d.createdAt is timestamp
+          && d.updatedAt == request.time;
+      }
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validSave();
+    }
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

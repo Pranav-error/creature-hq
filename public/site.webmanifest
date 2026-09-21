@@ -1,0 +1,25 @@
+{
+  "name": "Creature HQ",
+  "short_name": "Creature HQ",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#E3E2DE",
+  "theme_color": "#26282F",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

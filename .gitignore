@@ -1,0 +1,8 @@
+node_modules/
+.firebase/
+*.log
+public/_og.html
+tools/render/*.png
+original.html
+tools/patch_game.py
+tools/split.mjs
