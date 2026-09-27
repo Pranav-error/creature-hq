@@ -6,7 +6,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const SITE = (process.env.SITE || "https://creature-hq.web.app").replace(/\/$/, "");
-const V = "15";
+const V = "16";
 const game = fs.readFileSync("public/assets/game.js", "utf8").replace(/\r\n/g, "\n");
 const cut = (from, to) => { const a = game.indexOf(from), b = game.indexOf(to, a); if (a < 0 || b < 0) throw new Error("marker " + from); return game.slice(a, b); };
 
@@ -47,7 +47,7 @@ const FEATURES = [
   ["Proof vault", "Every project you shipped, with its code, live link and write-up in one place."],
   ["Trophies", "Twenty-three to earn, from your first quest to clearing the whole roadmap."],
   ["Floating companion", "Pop your creature out on top of other tabs so it can keep an eye on you."],
-  ["Saved to your account", "Pick up where you left off on any device."]
+  ["Workshop", "A code editor with a live preview, right next to each quest. Write HTML, CSS and JavaScript and watch it run."]
 ];
 
 const head = ({ title, desc, path, extra = "", robots = "index,follow", ogType = "website" }) => `<!DOCTYPE html>
@@ -184,7 +184,7 @@ ${header}
   <p class="band-lede">Last updated ${new Date().toISOString().slice(0, 10)}.</p>
   <h2>What we store</h2>
   <p>When you create an account we store your email address and, if you sign in with Google, your name and profile picture as provided by Google. Sign-in is handled by Google Firebase Authentication.</p>
-  <p>Your game save is stored in Google Cloud Firestore under your account: quest progress, quiz answers, notes, project submissions (including the links and write-ups you enter), trophies and your companion.</p>
+  <p>Your game save is stored in Google Cloud Firestore under your account: quest progress, quiz answers, notes, project submissions (including the links and write-ups you enter), trophies, your companion, and the code you write in the Workshop.</p>
   <h2>Why</h2>
   <p>Only to run Creature HQ: to sign you in and to load your progress on any device. We don't sell your data, show ads, or share it with anyone except the providers that host the service.</p>
   <h2>On your device</h2>

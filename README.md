@@ -20,6 +20,19 @@ Hosted on Firebase: sign-in with Firebase Auth (Google + email/password), one Fi
 | `tools/build-site.mjs` | Regenerates landing/privacy/404/sitemap/robots/manifest. |
 | `tools/build-app.mjs` | Regenerates `app.html` from `tools/body.html`. |
 | `tools/checkquiz.mjs` | Checks every checkpoint has 5 valid quiz questions. |
+| `public/assets/workshop.js` | The Workshop: project gallery, editor, live preview and console. |
+| `public/assets/editor.js` | CodeMirror 6, bundled from `tools/editor-entry.js` by `npm run build:editor`. |
+| `public-run/index.html` | The preview runner, deployed to its own site (creature-hq-run.web.app). |
+
+## The Workshop
+
+An HTML/CSS/JavaScript editor with a live preview. Each project is its own Firestore document, `users/{uid}/projects/{id}`, holding three files of up to 100 KB each (enforced in `firestore.rules`).
+
+Student code never runs on creature-hq.web.app. The preview is an iframe of **creature-hq-run.web.app**, a separate Firebase Hosting site. The app sends the files with `postMessage`, the runner writes them into a fresh page and reports `console` output and errors back, labelled `script.js:<line>`. Because it's a different site:
+
+- the code can't read the app's sign-in token or saved data;
+- it runs in its own browser process, so an endless loop can't freeze the app (the Workshop notices after a few seconds and pauses auto-run);
+- `localStorage` and `fetch` work like on a real web page, which the roadmap's JavaScript and API quests need.
 
 ## How saving works
 
@@ -42,8 +55,15 @@ npx serve public
 # local preview against emulators (needs Java): copy tools/demo-config.js over public/assets/firebase-config.js, then
 npx firebase-tools emulators:start --only auth,firestore --project demo-creature-hq
 
-# deploy
-npx firebase-tools deploy --only hosting,firestore:rules --project <project-id>
+# rebuild the editor bundle after changing tools/editor-entry.js
+npm install && npm run build:editor
+
+# local preview: app on 5173, runner on 5174 (open the app at http://127.0.0.1:5173)
+npx serve public -l 5173
+npx serve public-run -l 5174
+
+# deploy (app, runner and database rules)
+npx firebase-tools deploy --only hosting,firestore:rules --project creature-hq
 ```
 
 Bump `?v=14` in `tools/build-app.mjs`, `tools/build-site.mjs` and `sync.js` when you change assets, so browsers fetch the new files.

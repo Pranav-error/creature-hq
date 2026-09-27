@@ -12,11 +12,13 @@ import {
   signOut, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider, connectAuthEmulator
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp, Timestamp, connectFirestoreEmulator
+  getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp, Timestamp, connectFirestoreEmulator,
+  collection, getDocs, query, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js?v=15";
+import { firebaseConfig } from "./firebase-config.js?v=16";
 
-const GAME_SCRIPTS = ["/assets/quiz.js?v=15", "/assets/game.js?v=15"];
+// workshop.js before game.js: the game draws its first screen as soon as it loads
+const GAME_SCRIPTS = ["/assets/quiz.js?v=16", "/assets/workshop.js?v=16", "/assets/game.js?v=16"];
 const MAX_SAVE_CHARS = 900000;          // Firestore documents top out at 1 MiB
 const WRITE_DELAY = 1500;
 
@@ -87,13 +89,26 @@ function loadGame(){
   flushNotes();
 }
 
+/* ---------- Workshop projects: one document each, users/{uid}/projects/{id} ---------- */
+const PROJECT_LIMIT = 100;
+function localProjects(){
+  const KEY="hqProjects";
+  const all=()=>{ try{ return JSON.parse(ls.get(KEY)||"{}")||{}; }catch(e){ return {}; } };
+  return {
+    async list(){ return Object.entries(all()).map(([id,p])=>({id,...p})).sort((a,b)=>b.updatedAt-a.updatedAt); },
+    async save(id,p){ const a=all(); a[id]={name:p.name,files:p.files,questId:p.questId||null,createdAt:(a[id]&&a[id].createdAt)||Date.now(),updatedAt:Date.now()}; ls.set(KEY,JSON.stringify(a)); },
+    async remove(id){ const a=all(); delete a[id]; ls.set(KEY,JSON.stringify(a)); }
+  };
+}
+
 /* ---------- no config: local-only test mode on localhost ---------- */
 const configured = !!(firebaseConfig.apiKey && firebaseConfig.projectId);
 if(!configured){
   if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
     window.HQSync = { local:true, user:{email:"Local test mode", name:"", provider:"local", verified:true},
       changed(){}, lastSaved:0, async signOut(){ clearLocal(); location.href="/"; return {ok:true}; },
-      async deleteAccount(){ clearLocal(); location.href="/"; return {ok:true}; } };
+      async deleteAccount(){ clearLocal(); location.href="/"; return {ok:true}; },
+      projects: localProjects() };
     note("Local test mode: sign-in is off and progress stays in this browser.");
     loadGame();
   }else{
@@ -160,11 +175,31 @@ function start(){
       user:{ email:user.email||"", name:user.displayName||"", verified:user.emailVerified,
              provider:(user.providerData[0]&&user.providerData[0].providerId)||"password" },
       changed, flush:writeNow, lastSaved:0,
-      signOut:signOutFlow, deleteAccount
+      signOut:signOutFlow, deleteAccount,
+      projects: cloudProjects(user.uid)
     };
     if(push) writeNow();
     watch();
     loadGame();
+  }
+
+  function cloudProjects(uid){
+    const col = collection(db, "users", uid, "projects"), created = {};
+    const ms = t => t && typeof t.toMillis==="function" ? t.toMillis() : Date.now();
+    return {
+      async list(){
+        const snap = await getDocs(query(col, orderBy("updatedAt","desc"), limit(PROJECT_LIMIT)));
+        return snap.docs.map(d=>{ const x=d.data(); created[d.id]=x.createdAt; return {id:d.id, name:x.name, files:x.files||{}, questId:x.questId||null, createdAt:ms(x.createdAt), updatedAt:ms(x.updatedAt)}; });
+      },
+      async save(id, p){
+        if(!created[id]) created[id]=Timestamp.now();
+        await setDoc(doc(col, id), { name:String(p.name).slice(0,60), questId:p.questId||null,
+          files:{ html:p.files.html||"", css:p.files.css||"", js:p.files.js||"" },
+          createdAt:created[id], updatedAt:serverTimestamp() });
+      },
+      async remove(id){ await deleteDoc(doc(col, id)); delete created[id]; },
+      async removeAll(){ const snap=await getDocs(col); await Promise.all(snap.docs.map(d=>deleteDoc(d.ref))); }
+    };
   }
 
   /* ---------- writes ---------- */
@@ -254,6 +289,7 @@ function start(){
     }catch(e){ return {ok:false, error:friendly(e)}; }
     leaving=true; stale=true; clearTimeout(timer); if(unsub) unsub();
     try{
+      await window.HQSync.projects.removeAll();   // deleting the save document doesn't delete its projects
       await deleteDoc(ref);
       await deleteUser(user);
     }catch(e){ leaving=false; return {ok:false, error:friendly(e)}; }

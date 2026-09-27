@@ -1245,8 +1245,8 @@ function greeting(){
    VIEWS: tabs, side panel, Today, Roadmap, Companion, Vault,
    Trophies, Settings
    ========================================================= */
-const VIEWS=["today","roadmap","notebook","companion","vault","trophies","settings"];
-const VIEW_NAMES={today:"Today",roadmap:"Roadmap",notebook:"Notebook",companion:"Companion",vault:"Proof vault",trophies:"Trophies",settings:"Settings"};
+const VIEWS=["today","roadmap","workshop","notebook","companion","vault","trophies","settings"];
+const VIEW_NAMES={today:"Today",roadmap:"Roadmap",workshop:"Workshop",notebook:"Notebook",companion:"Companion",vault:"Proof vault",trophies:"Trophies",settings:"Settings"};
 let view="today";
 try{ const v=localStorage.getItem("hqView"); if(VIEWS.includes(v)) view=v; }catch(e){}
 let roadmapPhase=currentPhase(), pickedId=null;
@@ -1275,7 +1275,7 @@ function renderTabs(){
   const counts={notebook:Object.keys(state.notes).filter(hasNote).length||undefined,vault:Object.keys(state.subs).length, trophies:got+"/"+trophyDefs.length};
   $("tabs").innerHTML=VIEWS.map(v=>'<button type="button" class="tab" role="tab" id="tab-'+v+'" aria-controls="view-'+v+'" aria-selected="'+(v===view)+'" data-act="tab" data-view="'+v+'">'+VIEW_NAMES[v]+(counts[v]!==undefined?'<span class="count">'+counts[v]+'</span>':"")+'</button>').join("");
 }
-function renderView(){ ({today:renderToday,roadmap:renderRoadmap,notebook:renderNotebook,companion:renderCompanion,vault:renderVault,trophies:renderTrophies,settings:renderSettings})[view](); }
+function renderView(){ ({today:renderToday,roadmap:renderRoadmap,workshop:renderWorkshop,notebook:renderNotebook,companion:renderCompanion,vault:renderVault,trophies:renderTrophies,settings:renderSettings})[view](); }
 function renderAll(){ renderSide(); renderTabs(); renderView(); }
 
 function renderSide(){
@@ -1354,6 +1354,7 @@ function renderToday(){
       (sub?'<span class="tag-xp">'+ic("doc")+'Proof required · '+fmtN(subBaseXP(n.pi,n.si))+' xp</span>':'<span class="mono" style="font-size:12px">Trains '+trainText(TRAIN[st])+'</span>')+'</div>'+
       '<div class="actions">'+(sub&&!state.subs[id]&&quizPass(id)===5?'<button type="button" class="btn btn-primary" data-act="submit" data-id="'+id+'">'+ic("doc")+'Submit proof</button>'
         :'<button type="button" class="btn btn-primary" data-act="quiz" data-id="'+id+'">'+ic("check")+(quizPass(id)?'Continue quiz':'Take quiz')+'</button>'+(sub&&!state.subs[id]?'<button type="button" class="btn" data-act="submit" data-id="'+id+'">'+ic("doc")+'Submit proof</button>':''))+
+      (typeof wsQuestOk==="function"&&wsQuestOk(n.pi,n.si)?'<button type="button" class="btn" data-act="ws-quest" data-id="'+id+'">'+ic("html")+'Code it</button>':'')+
       '<button type="button" class="btn" data-act="notes" data-id="'+id+'">'+ic("pencil")+'Notes</button>'+
       '<button type="button" class="btn" data-act="open-phase" data-pi="'+n.pi+'" data-id="'+id+'">Show in roadmap</button>'+
       '<button type="button" class="btn btn-ghost" data-act="shuffle">'+ic("dice")+'Pick another</button></div>';
@@ -1437,7 +1438,8 @@ function renderRoadmap(){
       return '<div class="q'+(done?' done':'')+(avail?'':' disabled')+'" id="q-'+id+'">'+
         '<span class="q-state'+(!done&&passed?' part':'')+'" style="--p:'+(passed*20)+'%" aria-hidden="true">'+(done?ic("check"):'')+'</span>'+
         '<span class="q-main"><span class="q-text">'+esc(q)+'</span><span class="q-meta">'+meta.join("")+'</span></span>'+
-        '<span class="q-actions"><button type="button" class="btn btn-sm btn-icon btn-ghost note-btn'+(noted?' has':'')+'" data-act="notes" data-id="'+id+'" aria-label="'+(noted?'Open notes':'Add notes')+' for '+esc(q)+'" title="Notes">'+ic("pencil")+'</button>'+proofBtn+quizBtn+'</span></div>';
+        '<span class="q-actions"><button type="button" class="btn btn-sm btn-icon btn-ghost note-btn'+(noted?' has':'')+'" data-act="notes" data-id="'+id+'" aria-label="'+(noted?'Open notes':'Add notes')+' for '+esc(q)+'" title="Notes">'+ic("pencil")+'</button>'+
+          (avail&&typeof wsQuestOk==="function"&&wsQuestOk(pi,si)?'<button type="button" class="btn btn-sm" data-act="ws-quest" data-id="'+id+'" title="Build it in the Workshop">'+ic("html")+'Code it</button>':'')+proofBtn+quizBtn+'</span></div>';
     }).join("");
     stages+='<section class="stage"><header class="stage-head"><h3>'+esc(stage[0])+'</h3><span class="muted">'+dc+'/'+stage[1].length+'</span>'+
       '<span class="stage-rule'+(sub?' proof':'')+'">'+(sub?ic("doc")+'Quiz and proof · gives XP':'Quiz · trains '+trainText(tr))+'</span></header>'+
@@ -1526,7 +1528,7 @@ function accountCard(){
     '<div class="setting-row"><div><b>'+esc(u.email||u.name||"Signed in")+'</b><span class="desc" style="display:block">Signed in with '+via+'.'+(u.provider==="password"&&!u.verified?' Email not confirmed yet.':'')+'</span></div><button type="button" class="btn" data-act="sign-out">Sign out</button></div>'+
     '<div class="setting-row"><div><b>Delete account</b><span class="desc" style="display:block">Permanently deletes your account and everything saved to it.</span></div><button type="button" class="btn btn-danger" data-act="delete-account">Delete</button></div></article>';
 }
-const SHORTCUTS=[["1–7","Switch section"],["/","Search your notebook"],["R","Pick another quest"],["F","Start or pause the focus timer"],["G","Poke your companion"],["E","Feed its favourite snack"],["O","Get yelled at"],["M","Mute or unmute"],["P","Float your companion over other tabs"],["D","Switch light or dark mode"],["?","Show shortcuts"]];
+const SHORTCUTS=[["1–8","Switch section"],["Ctrl+Enter","Run code in the Workshop"],["/","Search your notebook"],["R","Pick another quest"],["F","Start or pause the focus timer"],["G","Poke your companion"],["E","Feed its favourite snack"],["O","Get yelled at"],["M","Mute or unmute"],["P","Float your companion over other tabs"],["D","Switch light or dark mode"],["?","Show shortcuts"]];
 function renderSettings(){
   $("view-settings").innerHTML='<header class="view-head"><div><h1>Settings</h1><p class="lede">'+(window.HQSync&&!HQSync.local?'Your progress is saved to your account and follows you to any device you sign in on.':'Progress is saved in this browser only. Export a backup before clearing browser data.')+'</p></div></header><div class="grid g-settings">'+accountCard()+
     '<article class="card"><h2 class="card-title" style="margin-bottom:12px">Preferences</h2>'+
@@ -2594,6 +2596,7 @@ function onAction(e){
     case "pip-close": closeFloating(); break;
     case "pip-focus": timer.running?togglePause():startFocus(); break;
     case "pip-feed": if(state.pet){ feed(SPECIES[state.pet.species].fav); renderPipBar(); } break;
+    default: if(a.startsWith("ws-")&&typeof wsAction==="function") wsAction(a,el);
   }
 }
 document.addEventListener("click",onAction);
@@ -2607,7 +2610,13 @@ addEventListener("keydown",e=>{
     if($("starterRoot").innerHTML&&state.pet&&$("starterClose")){ $("starterRoot").innerHTML=""; return; }
     closeModal(); return;
   }
+  if(view==="workshop"&&typeof ws!=="undefined"&&ws.cur&&(e.ctrlKey||e.metaKey)&&!e.altKey){
+    if(k==="s"){ e.preventDefault(); wsSaveNow(); return; }
+    if(k==="enter"){ e.preventDefault(); wsRun(true); return; }
+  }
   if(e.ctrlKey||e.metaKey||e.altKey) return;
+  // typing in the code editor must never trigger single-key shortcuts
+  if(e.target.closest&&e.target.closest(".cm-editor,[contenteditable=true]")) return;
   if($("titleRoot").innerHTML){
     if(e.key==="Enter"&&document.activeElement.tagName!=="BUTTON"){ e.preventDefault(); const g=$("titleGo"); if(g) g.click(); }
     else if(k==="d"&&!/input|textarea/i.test(e.target.tagName)) toggleTheme();
@@ -2619,7 +2628,7 @@ addEventListener("keydown",e=>{
   kIdx=(k===KONAMI[kIdx])?kIdx+1:(k===KONAMI[0]?(kIdx===2?2:1):0);
   if(kIdx===KONAMI.length){ kIdx=0; partyMode(); return; }
   if(modalOpen) return;
-  if(/^[1-7]$/.test(k)) go(VIEWS[+k-1]);
+  if(/^[1-8]$/.test(k)) go(VIEWS[+k-1]);
   else if(k==="/"){ e.preventDefault(); go("notebook"); const sb=$("nbSearch"); if(sb) sb.focus(); }
   else if(k==="r") shuffle();
   else if(k==="f") timer.running?togglePause():startFocus();

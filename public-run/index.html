@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex">
+<title>Preview · Creature HQ</title>
+<style>html,body{margin:0;font:14px system-ui,sans-serif;color:#555961;background:#fff}</style>
+</head>
+<body>
+<script>
+/* Creature HQ preview runner.
+   Lives on its own origin (creature-hq-run.web.app) so a student's code runs as a real web page
+   (localStorage and fetch work) but can never reach the app's sign-in token or saved data.
+   The Workshop loads this page fresh for every run and sends the files with postMessage. */
+(function(){
+  var ALLOWED = ["https://creature-hq.web.app", "https://creature-hq.firebaseapp.com", "http://127.0.0.1:5173", "http://localhost:5173"];
+  var host = window.parent !== window ? window.parent : window.opener;
+  if(!host){ document.body.textContent = "This page shows previews from the Creature HQ Workshop."; return; }
+  host.postMessage({type:"hq-ready"}, "*");   // carries no data; the reply is checked below
+
+  window.addEventListener("message", function(e){
+    if(ALLOWED.indexOf(e.origin) < 0 || e.source !== host) return;
+    var m = e.data || {};
+    if(m.type !== "hq-run") return;
+    if(window.opener) window.opener = null;   // a preview tab can't redirect the app tab
+    var built = build(String(m.html||""), String(m.css||""), String(m.js||""), e.origin, m.runId);
+    document.open(); document.write(built); document.close();
+  });
+
+  function esc(s, tag){ return s.replace(new RegExp("</" + tag, "gi"), "<\\/" + tag); }
+
+  // Reports console output and errors to the Workshop. Kept on one line so it doesn't shift line numbers.
+  function shim(origin, runId){
+    var code = "(function(){var P=parent!==window?parent:null,O=" + JSON.stringify(origin) + ",R=" + JSON.stringify(runId) + ";" +
+      "function ser(v,d){d=d||0;try{if(v===null)return'null';if(v===undefined)return'undefined';var t=typeof v;" +
+      "if(t==='string')return d?JSON.stringify(v):v;if(t==='number'||t==='boolean'||t==='bigint')return String(v);if(t==='symbol')return v.toString();" +
+      "if(t==='function')return'ƒ '+(v.name||'anonymous')+'()';if(v instanceof Error)return v.name+': '+v.message;" +
+      "if(typeof Element!=='undefined'&&v instanceof Element)return'<'+v.tagName.toLowerCase()+(v.id?'#'+v.id:'')+(typeof v.className==='string'&&v.className?'.'+v.className.trim().split(/\\s+/).join('.'):'')+'>';" +
+      "if(d>2)return Array.isArray(v)?'[…]':'{…}';" +
+      "if(Array.isArray(v))return'['+v.slice(0,50).map(function(x){return ser(x,d+1)}).join(', ')+(v.length>50?', …':'')+']';" +
+      "var k=Object.keys(v).slice(0,30);return(v.constructor&&v.constructor.name&&v.constructor.name!=='Object'?v.constructor.name+' ':'')+'{'+k.map(function(x){return x+': '+ser(v[x],d+1)}).join(', ')+(Object.keys(v).length>30?', …':'')+'}'}catch(e){return'[unprintable]'}}" +
+      "function send(level,args,line,file){try{var m={type:'hq-console',runId:R,level:level,text:Array.prototype.map.call(args,function(a){return ser(a)}).join(' ').slice(0,4000),line:/(^|\\/)script\\.js$/.test(file||'')&&line>1?line-1:0};(P||window.opener)&&(P||window.opener).postMessage(m,O)}catch(e){}}" +
+      "['log','info','warn','error','debug','table'].forEach(function(l){var o=console[l];console[l]=function(){send(l==='table'||l==='debug'?'log':l,arguments);try{o&&o.apply(console,arguments)}catch(e){}}});" +
+      "window.addEventListener('error',function(e){if(e.error||e.message)send('error',[e.error?(e.error.name+': '+e.error.message):e.message],e.lineno,e.filename)});" +
+      "window.addEventListener('unhandledrejection',function(e){send('error',['Uncaught (in promise) '+ser(e.reason)])});" +
+      "window.addEventListener('load',function(){try{(P||window.opener)&&(P||window.opener).postMessage({type:'hq-loaded',runId:R},O)}catch(e){}});" +
+      "})();";
+    return "<script>" + code + "<\/script>";
+  }
+
+  function build(html, css, js, origin, runId){
+    var style = "<style>\n" + esc(css, "style") + "\n</style>";
+    // label the block as script.js so errors report that file; its first line is this marker, so file line = reported line - 1
+    var body = "/*hq-js*/\n" + esc(js, "script") + "\n//# sourceURL=script.js\n";
+    var jsTag = "<script>" + body + "<\/script>";
+    var linkRe = /<link\b[^>]*href\s*=\s*["']?(?:\.\/)?style\.css["']?[^>]*>/i;
+    var scriptRe = /<script\b([^>]*)src\s*=\s*["']?(?:\.\/)?script\.js["']?([^>]*)>\s*<\/script>/i;
+    var usedCss = linkRe.test(html), usedJs = false, deferJs = false;
+    if(usedCss) html = html.replace(linkRe, function(){ return style; });
+    html = html.replace(scriptRe, function(all, a, b){
+      usedJs = true;
+      var attrs = a + b;
+      if(/type\s*=\s*["']?module/i.test(attrs)) return "<script type=\"module\">" + body + "<\/script>";
+      if(/\bdefer\b/i.test(attrs)){ deferJs = true; return ""; }   // defer: run after the page is parsed
+      return jsTag;
+    });
+    var full = /<html[\s>]|<!doctype/i.test(html);
+    if(!full) html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body>\n" + html + "\n</body>\n</html>";
+    // console shim goes first, on the same line as <head>, so line numbers in index.html stay true
+    var s = shim(origin, runId);
+    if(/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function(h){ return h + s; });
+    else html = s + html;
+    if(!usedCss) html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, style + "\n</head>") : style + html;
+    if((!usedJs || deferJs) && js.trim()) html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, jsTag + "\n</body>") : html + jsTag;
+    return html;
+  }
+})();
+</script>
+</body>
+</html>

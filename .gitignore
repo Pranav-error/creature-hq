@@ -6,3 +6,4 @@ tools/render/*.png
 original.html
 tools/patch_game.py
 tools/split.mjs
+tools/patch_*.py

@@ -1,1 +1,17 @@
-{ "projects": { "default": "creature-hq" } }
+{
+  "projects": {
+    "default": "creature-hq"
+  },
+  "targets": {
+    "creature-hq": {
+      "hosting": {
+        "app": [
+          "creature-hq"
+        ],
+        "run": [
+          "creature-hq-run"
+        ]
+      }
+    }
+  }
+}
